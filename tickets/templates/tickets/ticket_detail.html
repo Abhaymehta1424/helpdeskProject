@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>{{ ticket.title }}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    .container { max-width: 900px; }
+    .comment-box { background:#fafafa; padding:12px; border-radius:6px; }
+    .meta { color:#666; font-size:0.9rem; }
+    .sla-badge { margin-left:6px; }
+  </style>
+</head>
+<body class="container mt-4">
+  <a href="javascript:history.back()" class="btn btn-sm btn-outline-secondary mb-2">Back</a>
+  <h1>Ticket: {{ ticket.title }}</h1>
+
+  <p>
+    <strong>Status:</strong> {{ ticket.get_status_display }}
+    {% if ticket.status == 'completed' %}
+      {% if ticket.completed_within_hours %}
+        <span class="badge bg-success sla-badge">Completed on time (≤4h)</span>
+      {% else %}
+        <span class="badge bg-danger sla-badge">Completed (Delayed)</span>
+      {% endif %}
+    {% else %}
+      <span class="badge bg-warning text-dark sla-badge">Open</span>
+    {% endif %}
+  </p>
+
+  <p><strong>Description:</strong></p>
+  <p>{{ ticket.description }}</p>
+
+  <p><strong>Department:</strong>
+  {% if ticket.department %}
+    {{ ticket.department.name }}
+  {% else %}
+    Unassigned
+  {% endif %}
+  </p>
+
+  <hr>
+  <h3>Comments</h3>
+  <ul class="list-group mb-3">
+    {% for comment in comments %}
+    <li class="list-group-item">
+      <div class="d-flex justify-content-between">
+        <div><strong>{{ comment.user.username }}</strong></div>
+        <div class="meta">{{ comment.created_at|date:"Y-m-d H:i" }}</div>
+      </div>
+      <div class="comment-box mt-2">{{ comment.text }}</div>
+    </li>
+    {% empty %}
+    <li class="list-group-item">No comments yet.</li>
+    {% endfor %}
+  </ul>
+
+  <form method="post">
+    {% csrf_token %}
+    <div class="mb-3">
+      <label for="comment" class="form-label">Add Comment</label>
+      <textarea name="comment" id="comment" class="form-control" required></textarea>
+    </div>
+    <button type="submit" class="btn btn-primary">Send Comment</button>
+  </form>
+
+</body>
+</html>

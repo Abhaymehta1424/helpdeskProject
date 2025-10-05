@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Agent Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet" />
+    <style>
+        .table tbody tr {
+            height: 70px;
+            vertical-align: middle;
+        }
+        .batch-actions-bottom {
+            position: sticky;
+            bottom: 0;
+            background: #fff;
+            border-top: 1px solid #dee2e6;
+            z-index: 10;
+            padding: 16px 0 8px 0;
+        }
+        /* Custom class for the assignment form to ensure nowrap and spacing */
+        .assignment-controls-form {
+            display: flex;
+            align-items: center;
+            flex-wrap: nowrap; /* Prevents wrapping */
+            justify-content: center;
+            gap: 8px; /* Adds consistent spacing between elements */
+        }
+        .assignment-controls-form .form-select, .assignment-controls-form button {
+            margin: 0 !important; /* Removes default margin from the old nowrap-form style */
+        }
+        /* Style for the column containing the controls */
+        .assign-column {
+            min-width: 450px; /* Allocate more space for the controls */
+        }
+    </style>
+</head>
+<body class="container mt-4">
+
+    <h1>Agent Dashboard</h1>
+
+    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1050">
+        <div id="assignmentToast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body">Task assigned successfully!</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    </div>
+
+    <form method="post" id="batchForm">
+        {% csrf_token %}
+        <table class="table table-bordered align-middle">
+            <thead>
+                <tr>
+                    <th class="text-center align-middle"><input type="checkbox" id="select-all"></th>
+                    <th class="align-middle">Title</th>
+                    <th class="align-middle">Status</th>
+                    <th class="align-middle">Department</th>
+                    <th class="align-middle">Priority</th>
+                    <th class="align-middle text-center assign-column">Assign Department / Priority / Status</th>
+                    <th class="align-middle text-center">Delete</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ticket in tickets %}
+                <tr>
+                    <td class="text-center align-middle">
+                        <input type="checkbox" class="row-checkbox" name="selected_tickets" value="{{ ticket.id }}">
+                    </td>
+                    <td class="align-middle"><a href="{% url 'ticket_detail' ticket.id %}">{{ ticket.title }}</a></td>
+                    <td class="align-middle">{{ ticket.status }}</td>
+                    <td class="align-middle">
+                        {% if ticket.department %}
+                            {{ ticket.department.name }}
+                        {% else %}
+                            Unassigned
+                        {% endif %}
+                    </td>
+                    <td class="align-middle">
+                        {% if ticket.priority %}
+                            {{ ticket.get_priority_display }}
+                        {% else %}
+                            Medium
+                        {% endif %}
+                    </td>
+                    <td class="align-middle text-center assign-column">
+                        <form method="post" action="{% url 'agent_dashboard' %}" class="assignment-controls-form">
+                            {% csrf_token %}
+                            <input type="hidden" name="ticket_id" value="{{ ticket.id }}">
+                            <select name="department" class="form-select form-select-sm" required style="max-width: 140px;">
+                                <option disabled {% if not ticket.department %}selected{% endif %}>Select</option>
+                                {% for department in departments %}
+                                    <option value="{{ department.id }}" {% if ticket.department and ticket.department.id == department.id %}selected{% endif %}>{{ department.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <select name="priority" class="form-select form-select-sm" style="max-width: 110px;">
+                                {% for key, label in priority_choices %}
+                                    <option value="{{ key }}" {% if ticket.priority == key %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                            <select name="status" class="form-select form-select-sm" style="max-width: 120px;">
+                                {% for key, label in status_choices %}
+                                    <option value="{{ key }}" {% if ticket.status == key %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                            <button type="submit" class="btn btn-sm {% if ticket.department %}btn-success{% else %}btn-primary{% endif %}">
+                                {% if ticket.department %}Assigned{% else %}Assign{% endif %}
+                            </button>
+                        </form>
+                    </td>
+                    <td class="text-center align-middle">
+                        <form method="post" action="{% url 'delete_ticket' ticket.id %}" onsubmit="return confirmDeletion(event, '{{ ticket.status }}');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete Ticket">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center">No tickets found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="batch-actions-bottom d-flex align-items-center gap-3 border-top">
+            <input type="checkbox" id="select-all-bottom" class="ms-2">
+            <span class="ms-2">Select All</span>
+            <button type="submit" formaction="{% url 'mark_all_completed' %}" class="btn btn-success ms-4">
+                Mark All as Completed
+            </button>
+            <button type="submit" formaction="{% url 'delete_selected' %}" class="btn btn-danger ms-2" onclick="return confirm('Are you sure to delete all selected?');">
+                Delete Selected
+            </button>
+        </div>
+    </form>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    {% if messages %}
+        {% for message in messages %}
+            {% if message.tags == 'success' %}
+                <script>
+                    document.addEventListener('DOMContentLoaded', function () {
+                        var toastEl = document.getElementById('assignmentToast');
+                        if (toastEl) {
+                            var toast = new bootstrap.Toast(toastEl);
+                            toast.show();
+                        }
+                    });
+                </script>
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+
+    <script>
+        // Top Select All functionality
+        document.getElementById('select-all').addEventListener('change', function() {
+            var checked = this.checked;
+            document.querySelectorAll('.row-checkbox').forEach(function(checkbox) {
+                checkbox.checked = checked;
+            });
+            document.getElementById('select-all-bottom').checked = checked;
+        });
+
+        // Bottom Select All functionality
+        document.getElementById('select-all-bottom').addEventListener('change', function() {
+            var checked = this.checked;
+            document.querySelectorAll('.row-checkbox').forEach(function(checkbox) {
+                checkbox.checked = checked;
+            });
+            document.getElementById('select-all').checked = checked;
+        });
+
+        // Prevent delete if status not completed
+        function confirmDeletion(event, status) {
+            if (status !== 'completed') {
+                alert("Task is not completed yet and cannot be deleted.");
+                event.preventDefault();
+                return false;
+            }
+            return confirm("Are you sure you want to permanently delete this completed task?");
+        }
+    </script>
+
+</body>
+</html>
